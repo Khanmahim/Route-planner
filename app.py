@@ -8,29 +8,11 @@ init_db()
 
 st.set_page_config(page_title="RoutePro", page_icon="🚚", layout="wide")
 
-def parse_input(label, key, placeholder_addr, placeholder_coord, input_mode):
+def location_input(label, key, input_mode):
     if input_mode == "📍 Address":
-        return st.text_input(label, placeholder=placeholder_addr, key=key)
+        return st.text_input(label, placeholder="e.g. Dallas TX USA", key=key)
     else:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            lat = st.number_input(f"{label} Lat", value=0.0, format="%.6f", key=f"{key}_lat")
-        with col_b:
-            lon = st.number_input(f"{label} Lon", value=0.0, format="%.6f", key=f"{key}_lon")
-        if lat != 0.0 and lon != 0.0:
-            return f"{lat},{lon}"
-        return ""
-
-def parse_coord_string(s):
-    try:
-        parts = s.strip().split(",")
-        if len(parts) == 2:
-            lat, lon = float(parts[0].strip()), float(parts[1].strip())
-            if -90 <= lat <= 90 and -180 <= lon <= 180:
-                return (lat, lon)
-    except:
-        pass
-    return None
+        return st.text_input(label, placeholder="e.g. 32.910097, -96.745197", key=key)
 
 st.markdown("""
 <style>
@@ -96,14 +78,15 @@ st.markdown("""
         border-left: 4px solid #A7C4F4 !important;
         border-radius: 12px !important;
     }
-    .coord-box {
+    .coord-tip {
         background: linear-gradient(135deg, #F0E8FF, #E8F4FF);
         border-radius: 12px;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border: 1.5px dashed #B07DB8;
-        margin-bottom: 8px;
-        font-size: 13px;
+        margin-bottom: 10px;
+        font-size: 12px;
         color: #5C4A6E;
+        line-height: 1.6;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -111,32 +94,33 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### 📍 Route Details")
 
-    st.markdown("**Input Mode**")
     input_mode = st.radio(
-        "Choose how to enter locations:",
-        ["📍 Address", "🌐 Coordinates (Lat, Lon)"],
-        horizontal=True,
-        label_visibility="collapsed"
+        "Input Mode",
+        ["📍 Address", "🌐 Coordinates"],
+        horizontal=True
     )
 
-    if input_mode == "🌐 Coordinates (Lat, Lon)":
+    if input_mode == "🌐 Coordinates":
         st.markdown("""
-        <div class='coord-box'>
-        💡 <b>Tip:</b> Get coordinates from<br>
-        <a href='https://maps.google.com' target='_blank'>Google Maps</a> →
-        Right-click any spot → Copy coordinates!
+        <div class='coord-tip'>
+        📌 <b>How to get coordinates:</b><br>
+        1. Open <a href='https://maps.google.com' target='_blank'>Google Maps</a><br>
+        2. Right-click any location<br>
+        3. Click the numbers at the top<br>
+        4. They auto-copy! Paste here 👇<br><br>
+        📋 <b>Format:</b> <code>32.910097, -96.745197</code>
         </div>
         """, unsafe_allow_html=True)
 
     route_name = st.text_input("Route Name", placeholder="e.g. Monday Deliveries")
-    origin = parse_input("Origin", "origin", "e.g. Dallas, TX", "e.g. 32.7767, -96.7970", input_mode)
-    destination = parse_input("Destination", "destination", "e.g. Plano, TX", "e.g. 33.0198, -96.6989", input_mode)
+    origin = location_input("📍 Origin", "origin", input_mode)
+    destination = location_input("🏁 Destination", "destination", input_mode)
 
     st.markdown("### 🛑 Stops")
     num_stops = st.number_input("Number of Stops", min_value=1, max_value=20, value=2)
     stops = []
     for i in range(num_stops):
-        stop = parse_input(f"Stop {i+1}", f"stop_{i}", f"e.g. Stop {i+1} address", f"e.g. 32.9, -96.8", input_mode)
+        stop = location_input(f"🛑 Stop {i+1}", f"stop_{i}", input_mode)
         stops.append(stop)
 
     st.divider()
@@ -155,9 +139,9 @@ with col1:
     st.markdown("### 🗺️ Route Map")
     if optimize_btn:
         if not origin or not destination or any(s == "" for s in stops):
-            st.error("⚠️ Please fill in all address fields!")
+            st.error("⚠️ Please fill in all location fields!")
         else:
-            with st.spinner("🌸 Geocoding addresses and optimizing route..."):
+            with st.spinner("🌸 Optimizing your route..."):
                 result, error = optimize_route(origin, stops, destination)
             if error:
                 st.error(f"Error: {error}")
@@ -170,7 +154,7 @@ with col1:
                         result["total_distance"],
                         result["estimated_time"]
                     )
-                    st.success(f"🌸 Route '{route_name}' saved successfully!")
+                    st.success(f"🌸 Route '{route_name}' saved!")
 
     if "result" in st.session_state:
         result = st.session_state["result"]
@@ -183,44 +167,29 @@ with col1:
         else:
             st.warning("⚠️ Using straight-line estimate")
 
-        m = folium.Map(location=all_coords[0], zoom_start=12,
-                      tiles="CartoDB Positron")
-
-        folium.Marker(all_coords[0], tooltip="🟢 Origin",
-                     icon=folium.Icon(color="pink", icon="home")).add_to(m)
+        m = folium.Map(location=all_coords[0], zoom_start=12, tiles="CartoDB Positron")
+        folium.Marker(all_coords[0], tooltip="🟢 Origin", icon=folium.Icon(color="pink", icon="home")).add_to(m)
         for i, coord in enumerate(all_coords[1:-1]):
-            folium.Marker(coord,
-                         tooltip=f"🟠 Stop {i+1}: {result['ordered_stops'][i]}",
-                         icon=folium.Icon(color="purple", icon="map-marker")).add_to(m)
-        folium.Marker(all_coords[-1], tooltip="🔴 Destination",
-                     icon=folium.Icon(color="red", icon="flag")).add_to(m)
-        folium.PolyLine(map_coords, color="#F4A7B9", weight=5,
-                       opacity=0.9).add_to(m)
+            folium.Marker(coord, tooltip=f"🟠 Stop {i+1}: {result['ordered_stops'][i]}", icon=folium.Icon(color="purple", icon="map-marker")).add_to(m)
+        folium.Marker(all_coords[-1], tooltip="🔴 Destination", icon=folium.Icon(color="red", icon="flag")).add_to(m)
+        folium.PolyLine(map_coords, color="#F4A7B9", weight=5, opacity=0.9).add_to(m)
 
         st_folium(m, width=700, height=500)
     else:
-        m = folium.Map(location=[32.7767, -96.7970], zoom_start=10,
-                      tiles="CartoDB Positron")
+        m = folium.Map(location=[32.7767, -96.7970], zoom_start=10, tiles="CartoDB Positron")
         st_folium(m, width=700, height=500)
 
 with col2:
     st.markdown("### 📊 Route Summary")
     if "result" in st.session_state:
         result = st.session_state["result"]
-
         total_km = result["total_distance"]
         total_miles = round(total_km * 0.621371, 2)
         est_time = result["estimated_time"]
-
         gallons_used = round(total_miles / mpg, 2)
         fuel_cost = round(gallons_used * fuel_price, 2)
-
         all_coords = result["all_coords"]
-        all_labels = (
-            [result["origin"]]
-            + result["ordered_stops"]
-            + [result["destination"]]
-        )
+        all_labels = [result["origin"]] + result["ordered_stops"] + [result["destination"]]
 
         st.metric("📏 Total Distance", f"{total_miles} miles")
         st.metric("⏱️ Estimated Time", f"{est_time} hrs")
@@ -232,24 +201,21 @@ with col2:
         st.metric("🚗 Vehicle MPG", f"{mpg} MPG")
 
         st.divider()
-        st.markdown(
-            f"""
-            <div style='background: linear-gradient(135deg, #FFE4F0, #E4F0FF);
-                        padding:20px; border-radius:20px; text-align:center;
-                        border: 2px solid #F4A7B9;
-                        box-shadow: 0 4px 15px rgba(244,167,185,0.3);'>
-                <p style='color:#B07DB8; font-size:13px; margin:0; font-weight:600;
-                          letter-spacing:1px;'>💰 TOTAL FUEL COST</p>
-                <p style='background: linear-gradient(90deg, #F4A7B9, #A7C4F4);
-                          -webkit-background-clip: text;
-                          -webkit-text-fill-color: transparent;
-                          font-size:42px; font-weight:900; margin:8px 0'>${fuel_cost}</p>
-                <p style='color:#B07DB8; font-size:11px; margin:0;'>
-                    {total_miles} miles • {gallons_used} gal • ${fuel_price}/gal</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #FFE4F0, #E4F0FF);
+                    padding:20px; border-radius:20px; text-align:center;
+                    border: 2px solid #F4A7B9;
+                    box-shadow: 0 4px 15px rgba(244,167,185,0.3);'>
+            <p style='color:#B07DB8; font-size:13px; margin:0; font-weight:600;
+                      letter-spacing:1px;'>💰 TOTAL FUEL COST</p>
+            <p style='background: linear-gradient(90deg, #F4A7B9, #A7C4F4);
+                      -webkit-background-clip: text;
+                      -webkit-text-fill-color: transparent;
+                      font-size:42px; font-weight:900; margin:8px 0'>${fuel_cost}</p>
+            <p style='color:#B07DB8; font-size:11px; margin:0;'>
+                {total_miles} miles • {gallons_used} gal • ${fuel_price}/gal</p>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 🛣️ Leg-by-Leg Breakdown")
@@ -264,8 +230,7 @@ with col2:
             st.markdown(f"""
             <div style='background: linear-gradient(135deg, {color}40, {color}20);
                         padding: 10px 14px; border-radius: 12px;
-                        border-left: 4px solid {color};
-                        margin-bottom: 8px;'>
+                        border-left: 4px solid {color}; margin-bottom: 8px;'>
                 <b style='color:#5C4A6E;'>{i+1}. {all_labels[i]} → {all_labels[i+1]}</b><br>
                 <span style='color:#888; font-size:13px;'>
                     📏 {leg_miles} mi &nbsp;|&nbsp; ⛽ {leg_gallons} gal &nbsp;|&nbsp; 💵 ${leg_cost}
