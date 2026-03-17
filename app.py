@@ -7,37 +7,165 @@ from optimizer import optimize_route
 init_db()
 
 st.set_page_config(page_title="RoutePro", page_icon="🚚", layout="wide")
+
+st.markdown("""
+<style>
+    /* Main background */
+    .stApp {
+        background: linear-gradient(135deg, #FFF0F5 0%, #F0F8FF 50%, #F5FFF0 100%);
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #FFE4F0 0%, #E4F0FF 100%);
+        border-right: 2px solid #F4A7B9;
+    }
+
+    /* Title */
+    h1 {
+        background: linear-gradient(90deg, #F4A7B9, #A7C4F4, #A7F4C4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2.5rem !important;
+        font-weight: 800 !important;
+    }
+
+    /* All subheaders */
+    h2, h3 {
+        color: #B07DB8 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Metric cards */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #FFE8F4, #E8F4FF);
+        border-radius: 16px;
+        padding: 12px 16px;
+        border: 1.5px solid #F4A7B9;
+        margin-bottom: 8px;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #B07DB8 !important;
+        font-weight: 600 !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: #7DB8B0 !important;
+        font-weight: 800 !important;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(90deg, #F4A7B9, #A7C4F4) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 20px !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        padding: 0.6rem 1.2rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(244, 167, 185, 0.4) !important;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(244, 167, 185, 0.6) !important;
+    }
+
+    /* Input fields */
+    .stTextInput > div > div > input {
+        border-radius: 12px !important;
+        border: 1.5px solid #F4A7B9 !important;
+        background: #FFF8FB !important;
+        color: #5C4A6E !important;
+    }
+
+    .stNumberInput > div > div > input {
+        border-radius: 12px !important;
+        border: 1.5px solid #A7C4F4 !important;
+        background: #F8FBFF !important;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: linear-gradient(90deg, #FFE8F4, #E8F4FF) !important;
+        border-radius: 12px !important;
+        color: #B07DB8 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Success/warning/error messages */
+    .stSuccess {
+        background: linear-gradient(90deg, #E8FFF0, #F0FFE8) !important;
+        border-left: 4px solid #A7F4C4 !important;
+        border-radius: 12px !important;
+    }
+
+    .stWarning {
+        background: linear-gradient(90deg, #FFF8E8, #FFFAE8) !important;
+        border-left: 4px solid #F4E4A7 !important;
+        border-radius: 12px !important;
+    }
+
+    .stError {
+        background: linear-gradient(90deg, #FFE8E8, #FFF0F0) !important;
+        border-left: 4px solid #F4A7A7 !important;
+        border-radius: 12px !important;
+    }
+
+    /* Divider */
+    hr {
+        border-color: #F4A7B9 !important;
+        opacity: 0.4;
+    }
+
+    /* Spinner */
+    .stSpinner > div {
+        border-top-color: #F4A7B9 !important;
+    }
+
+    /* Info box */
+    .stInfo {
+        background: linear-gradient(90deg, #E8F4FF, #F0E8FF) !important;
+        border-left: 4px solid #A7C4F4 !important;
+        border-radius: 12px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🚚 RoutePro — Delivery Route Planner")
+st.markdown("<p style='color:#B07DB8; margin-top:-15px; font-size:1rem;'>✨ Plan smarter. Drive better. Save more.</p>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("📍 Enter Route Details")
+    st.markdown("### 📍 Route Details")
     route_name = st.text_input("Route Name", placeholder="e.g. Monday Deliveries")
     origin = st.text_input("Origin Address", placeholder="e.g. 123 Main St, Dallas, TX")
     destination = st.text_input("Final Destination", placeholder="e.g. 456 Elm St, Dallas, TX")
-    
-    st.subheader("🛑 Stops")
+
+    st.markdown("### 🛑 Stops")
     num_stops = st.number_input("Number of Stops", min_value=1, max_value=20, value=2)
     stops = []
     for i in range(num_stops):
         stop = st.text_input(f"Stop {i+1}", placeholder=f"e.g. Stop {i+1} address", key=f"stop_{i}")
         stops.append(stop)
-    
+
     st.divider()
-    st.subheader("⛽ Fuel Settings")
+    st.markdown("### ⛽ Fuel Settings")
     fuel_price = st.number_input("Fuel Price ($ per gallon)", min_value=0.01, value=3.50, step=0.01)
     mpg = st.number_input("Vehicle Fuel Efficiency (MPG)", min_value=1.0, value=25.0, step=0.5)
-    
-    optimize_btn = st.button("🗺️ Optimize Route", use_container_width=True)
+
+    optimize_btn = st.button("🗺️ Optimize My Route!", use_container_width=True)
 
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("🗺️ Route Map")
+    st.markdown("### 🗺️ Route Map")
     if optimize_btn:
         if not origin or not destination or any(s == "" for s in stops):
-            st.error("Please fill in all address fields.")
+            st.error("⚠️ Please fill in all address fields!")
         else:
-            with st.spinner("Geocoding addresses and optimizing route..."):
+            with st.spinner("🌸 Geocoding addresses and optimizing route..."):
                 result, error = optimize_route(origin, stops, destination)
             if error:
                 st.error(f"Error: {error}")
@@ -50,7 +178,7 @@ with col1:
                         result["total_distance"],
                         result["estimated_time"]
                     )
-                    st.success(f"Route '{route_name}' saved!")
+                    st.success(f"🌸 Route '{route_name}' saved successfully!")
 
     if "result" in st.session_state:
         result = st.session_state["result"]
@@ -58,26 +186,33 @@ with col1:
         map_coords = result.get("map_coords", all_coords)
         routing_mode = result.get("routing_mode", "straight")
 
-        m = folium.Map(location=all_coords[0], zoom_start=12)
-
         if routing_mode == "real":
             st.success("✅ Using real road routing!")
         else:
-            st.warning("⚠️ Using straight-line estimate (real routing unavailable)")
+            st.warning("⚠️ Using straight-line estimate")
 
-        folium.Marker(all_coords[0], tooltip="Origin", icon=folium.Icon(color="green")).add_to(m)
+        m = folium.Map(location=all_coords[0], zoom_start=12,
+                      tiles="CartoDB Positron")
+
+        folium.Marker(all_coords[0], tooltip="🟢 Origin",
+                     icon=folium.Icon(color="pink", icon="home")).add_to(m)
         for i, coord in enumerate(all_coords[1:-1]):
-            folium.Marker(coord, tooltip=f"Stop {i+1}: {result['ordered_stops'][i]}", icon=folium.Icon(color="orange")).add_to(m)
-        folium.Marker(all_coords[-1], tooltip="Destination", icon=folium.Icon(color="red")).add_to(m)
-        folium.PolyLine(map_coords, color="blue", weight=4).add_to(m)
+            folium.Marker(coord,
+                         tooltip=f"🟠 Stop {i+1}: {result['ordered_stops'][i]}",
+                         icon=folium.Icon(color="purple", icon="map-marker")).add_to(m)
+        folium.Marker(all_coords[-1], tooltip="🔴 Destination",
+                     icon=folium.Icon(color="red", icon="flag")).add_to(m)
+        folium.PolyLine(map_coords, color="#F4A7B9", weight=5,
+                       opacity=0.9).add_to(m)
 
         st_folium(m, width=700, height=500)
     else:
-        m = folium.Map(location=[32.7767, -96.7970], zoom_start=10)
+        m = folium.Map(location=[32.7767, -96.7970], zoom_start=10,
+                      tiles="CartoDB Positron")
         st_folium(m, width=700, height=500)
 
 with col2:
-    st.subheader("📊 Route Summary")
+    st.markdown("### 📊 Route Summary")
     if "result" in st.session_state:
         result = st.session_state["result"]
 
@@ -99,7 +234,7 @@ with col2:
         st.metric("⏱️ Estimated Time", f"{est_time} hrs")
 
         st.divider()
-        st.subheader("⛽ Fuel Cost Breakdown")
+        st.markdown("### ⛽ Fuel Breakdown")
         st.metric("🔢 Gallons Used", f"{gallons_used} gal")
         st.metric("💵 Fuel Price", f"${fuel_price}/gal")
         st.metric("🚗 Vehicle MPG", f"{mpg} MPG")
@@ -107,29 +242,47 @@ with col2:
         st.divider()
         st.markdown(
             f"""
-            <div style='background-color:#1e1e2e;padding:16px;border-radius:10px;text-align:center'>
-                <p style='color:#aaa;font-size:14px;margin:0'>💰 TOTAL ESTIMATED FUEL COST</p>
-                <p style='color:#00e676;font-size:36px;font-weight:bold;margin:4px 0'>${fuel_cost}</p>
+            <div style='background: linear-gradient(135deg, #FFE4F0, #E4F0FF);
+                        padding:20px; border-radius:20px; text-align:center;
+                        border: 2px solid #F4A7B9;
+                        box-shadow: 0 4px 15px rgba(244,167,185,0.3);'>
+                <p style='color:#B07DB8; font-size:13px; margin:0; font-weight:600;
+                          letter-spacing:1px;'>💰 TOTAL FUEL COST</p>
+                <p style='background: linear-gradient(90deg, #F4A7B9, #A7C4F4);
+                          -webkit-background-clip: text;
+                          -webkit-text-fill-color: transparent;
+                          font-size:42px; font-weight:900; margin:8px 0'>${fuel_cost}</p>
+                <p style='color:#B07DB8; font-size:11px; margin:0;'>
+                    {total_miles} miles • {gallons_used} gal • ${fuel_price}/gal</p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
         st.divider()
-        st.subheader("🛣️ Leg-by-Leg Breakdown")
+        st.markdown("### 🛣️ Leg-by-Leg Breakdown")
+        colors = ["#FFB3C6", "#B3D4FF", "#B3FFD4", "#FFD4B3", "#D4B3FF"]
         for i in range(len(all_coords) - 1):
             from geopy.distance import geodesic
             leg_km = round(geodesic(all_coords[i], all_coords[i+1]).kilometers, 2)
             leg_miles = round(leg_km * 0.621371, 2)
             leg_gallons = round(leg_miles / mpg, 2)
             leg_cost = round(leg_gallons * fuel_price, 2)
+            color = colors[i % len(colors)]
             st.markdown(f"""
-            **{i+1}. {all_labels[i]} → {all_labels[i+1]}**
-            📏 {leg_miles} mi &nbsp;|&nbsp; ⛽ {leg_gallons} gal &nbsp;|&nbsp; 💵 ${leg_cost}
-            """)
+            <div style='background: linear-gradient(135deg, {color}40, {color}20);
+                        padding: 10px 14px; border-radius: 12px;
+                        border-left: 4px solid {color};
+                        margin-bottom: 8px;'>
+                <b style='color:#5C4A6E;'>{i+1}. {all_labels[i]} → {all_labels[i+1]}</b><br>
+                <span style='color:#888; font-size:13px;'>
+                    📏 {leg_miles} mi &nbsp;|&nbsp; ⛽ {leg_gallons} gal &nbsp;|&nbsp; 💵 ${leg_cost}
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.divider()
-        st.subheader("💾 Saved Routes")
+        st.markdown("### 💾 Saved Routes")
         routes = load_routes()
         if routes:
             for r in routes:
@@ -139,12 +292,11 @@ with col2:
                     st.write(f"**Distance:** {r[5]} km")
                     st.write(f"**Est. Time:** {r[6]} hrs")
         else:
-            st.info("No saved routes yet.")
+            st.info("🌸 No saved routes yet.")
     else:
-        st.info("Enter your route details and click Optimize Route to see the cost breakdown.")
-
+        st.info("✨ Enter your route details and click Optimize to see the magic!")
         st.divider()
-        st.subheader("💾 Saved Routes")
+        st.markdown("### 💾 Saved Routes")
         routes = load_routes()
         if routes:
             for r in routes:
@@ -154,4 +306,4 @@ with col2:
                     st.write(f"**Distance:** {r[5]} km")
                     st.write(f"**Est. Time:** {r[6]} hrs")
         else:
-            st.info("No saved routes yet.")
+            st.info("🌸 No saved routes yet.")
