@@ -3,6 +3,8 @@ import folium
 from streamlit_folium import st_folium
 from database import init_db, save_route, load_routes
 from optimizer import optimize_route
+from datetime import datetime
+import random
 
 init_db()
 
@@ -88,8 +90,39 @@ st.markdown("""
         color: #5C4A6E;
         line-height: 1.6;
     }
+    .route-badge {
+        background: linear-gradient(90deg, #F4A7B9, #A7C4F4);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        display: inline-block;
+        margin-bottom: 6px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+ROUTE_ADJECTIVES = [
+    "Swift", "Breezy", "Golden", "Turbo", "Lucky",
+    "Speedy", "Stellar", "Magic", "Smooth", "Zippy",
+    "Cosmic", "Nimble", "Rapid", "Blazing", "Sunny"
+]
+
+ROUTE_NOUNS = [
+    "Falcon", "Arrow", "Comet", "Drifter", "Voyager",
+    "Rocket", "Dasher", "Cruiser", "Sprinter", "Glider",
+    "Pathfinder", "Express", "Bolt", "Rider", "Chaser"
+]
+
+def generate_route_name(origin, num_stops):
+    now = datetime.now()
+    day = now.strftime("%a")
+    time_str = now.strftime("%I:%M %p")
+    adj = random.choice(ROUTE_ADJECTIVES)
+    noun = random.choice(ROUTE_NOUNS)
+    origin_short = origin.split(",")[0].strip()[:15]
+    return f"{adj} {noun} — {origin_short} • {num_stops} stops • {day} {time_str}"
 
 with st.sidebar:
     st.markdown("### 📍 Route Details")
@@ -112,7 +145,6 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    route_name = st.text_input("Route Name", placeholder="e.g. Monday Deliveries")
     origin = location_input("📍 Origin", "origin", input_mode)
     destination = location_input("🏁 Destination", "destination", input_mode)
 
@@ -146,15 +178,19 @@ with col1:
             if error:
                 st.error(f"Error: {error}")
             else:
+                # Auto-generate route name
+                auto_name = generate_route_name(origin, len(stops))
+                result["route_name"] = auto_name
                 st.session_state["result"] = result
-                if route_name:
-                    save_route(
-                        route_name, origin, destination,
-                        result["ordered_stops"],
-                        result["total_distance"],
-                        result["estimated_time"]
-                    )
-                    st.success(f"🌸 Route '{route_name}' saved!")
+
+                # Always auto-save
+                save_route(
+                    auto_name, origin, destination,
+                    result["ordered_stops"],
+                    result["total_distance"],
+                    result["estimated_time"]
+                )
+                st.success(f"✅ Route saved as **{auto_name}**")
 
     if "result" in st.session_state:
         result = st.session_state["result"]
@@ -190,6 +226,10 @@ with col2:
         fuel_cost = round(gallons_used * fuel_price, 2)
         all_coords = result["all_coords"]
         all_labels = [result["origin"]] + result["ordered_stops"] + [result["destination"]]
+
+        # Show auto-generated name as badge
+        if "route_name" in result:
+            st.markdown(f"<div class='route-badge'>🗺️ {result['route_name']}</div>", unsafe_allow_html=True)
 
         st.metric("📏 Total Distance", f"{total_miles} miles")
         st.metric("⏱️ Estimated Time", f"{est_time} hrs")
@@ -238,29 +278,21 @@ with col2:
             </div>
             """, unsafe_allow_html=True)
 
-        st.divider()
-        st.markdown("### 💾 Saved Routes")
-        routes = load_routes()
-        if routes:
-            for r in routes:
-                with st.expander(f"📦 {r[1]} — {r[7]}"):
-                    st.write(f"**Origin:** {r[2]}")
-                    st.write(f"**Destination:** {r[3]}")
-                    st.write(f"**Distance:** {r[5]} km")
-                    st.write(f"**Est. Time:** {r[6]} hrs")
-        else:
-            st.info("🌸 No saved routes yet.")
+    st.divider()
+    st.markdown("### 📚 Route Library")
+    routes = load_routes()
+    if routes:
+        st.markdown(f"<p style='color:#B07DB8; font-size:13px;'>🗂️ {len(routes)} route(s) saved</p>", unsafe_allow_html=True)
+        for r in routes:
+            with st.expander(f"🗺️ {r[1]}"):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown(f"**📍 From:** {r[2]}")
+                    st.markdown(f"**🏁 To:** {r[3]}")
+                    st.markdown(f"**🕐 Saved:** {r[7]}")
+                with col_b:
+                    st.markdown(f"**📏 Distance:** {round(float(r[5]) * 0.621371, 2)} miles")
+                    st.markdown(f"**⏱️ Est. Time:** {r[6]} hrs")
+                    st.markdown(f"**🛑 Stops:** {r[4]}")
     else:
-        st.info("✨ Enter your route details and click Optimize to see the magic!")
-        st.divider()
-        st.markdown("### 💾 Saved Routes")
-        routes = load_routes()
-        if routes:
-            for r in routes:
-                with st.expander(f"📦 {r[1]} — {r[7]}"):
-                    st.write(f"**Origin:** {r[2]}")
-                    st.write(f"**Destination:** {r[3]}")
-                    st.write(f"**Distance:** {r[5]} km")
-                    st.write(f"**Est. Time:** {r[6]} hrs")
-        else:
-            st.info("🌸 No saved routes yet.")
+        st.info("🌸 No saved routes yet. Optimize a route to get started!")
