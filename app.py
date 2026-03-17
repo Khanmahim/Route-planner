@@ -8,20 +8,39 @@ init_db()
 
 st.set_page_config(page_title="RoutePro", page_icon="🚚", layout="wide")
 
+def parse_input(label, key, placeholder_addr, placeholder_coord, input_mode):
+    if input_mode == "📍 Address":
+        return st.text_input(label, placeholder=placeholder_addr, key=key)
+    else:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            lat = st.number_input(f"{label} Lat", value=0.0, format="%.6f", key=f"{key}_lat")
+        with col_b:
+            lon = st.number_input(f"{label} Lon", value=0.0, format="%.6f", key=f"{key}_lon")
+        if lat != 0.0 and lon != 0.0:
+            return f"{lat},{lon}"
+        return ""
+
+def parse_coord_string(s):
+    try:
+        parts = s.strip().split(",")
+        if len(parts) == 2:
+            lat, lon = float(parts[0].strip()), float(parts[1].strip())
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                return (lat, lon)
+    except:
+        pass
+    return None
+
 st.markdown("""
 <style>
-    /* Main background */
     .stApp {
         background: linear-gradient(135deg, #FFF0F5 0%, #F0F8FF 50%, #F5FFF0 100%);
     }
-    
-    /* Sidebar */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #FFE4F0 0%, #E4F0FF 100%);
         border-right: 2px solid #F4A7B9;
     }
-
-    /* Title */
     h1 {
         background: linear-gradient(90deg, #F4A7B9, #A7C4F4, #A7F4C4);
         -webkit-background-clip: text;
@@ -29,14 +48,7 @@ st.markdown("""
         font-size: 2.5rem !important;
         font-weight: 800 !important;
     }
-
-    /* All subheaders */
-    h2, h3 {
-        color: #B07DB8 !important;
-        font-weight: 700 !important;
-    }
-
-    /* Metric cards */
+    h2, h3 { color: #B07DB8 !important; font-weight: 700 !important; }
     [data-testid="stMetric"] {
         background: linear-gradient(135deg, #FFE8F4, #E8F4FF);
         border-radius: 16px;
@@ -44,18 +56,8 @@ st.markdown("""
         border: 1.5px solid #F4A7B9;
         margin-bottom: 8px;
     }
-
-    [data-testid="stMetricLabel"] {
-        color: #B07DB8 !important;
-        font-weight: 600 !important;
-    }
-
-    [data-testid="stMetricValue"] {
-        color: #7DB8B0 !important;
-        font-weight: 800 !important;
-    }
-
-    /* Buttons */
+    [data-testid="stMetricLabel"] { color: #B07DB8 !important; font-weight: 600 !important; }
+    [data-testid="stMetricValue"] { color: #7DB8B0 !important; font-weight: 800 !important; }
     .stButton > button {
         background: linear-gradient(90deg, #F4A7B9, #A7C4F4) !important;
         color: white !important;
@@ -67,87 +69,74 @@ st.markdown("""
         transition: all 0.3s ease !important;
         box-shadow: 0 4px 15px rgba(244, 167, 185, 0.4) !important;
     }
-
     .stButton > button:hover {
         transform: translateY(-2px) !important;
         box-shadow: 0 6px 20px rgba(244, 167, 185, 0.6) !important;
     }
-
-    /* Input fields */
     .stTextInput > div > div > input {
         border-radius: 12px !important;
         border: 1.5px solid #F4A7B9 !important;
         background: #FFF8FB !important;
         color: #5C4A6E !important;
     }
-
     .stNumberInput > div > div > input {
         border-radius: 12px !important;
         border: 1.5px solid #A7C4F4 !important;
         background: #F8FBFF !important;
     }
-
-    /* Expander */
     .streamlit-expanderHeader {
         background: linear-gradient(90deg, #FFE8F4, #E8F4FF) !important;
         border-radius: 12px !important;
         color: #B07DB8 !important;
         font-weight: 600 !important;
     }
-
-    /* Success/warning/error messages */
-    .stSuccess {
-        background: linear-gradient(90deg, #E8FFF0, #F0FFE8) !important;
-        border-left: 4px solid #A7F4C4 !important;
-        border-radius: 12px !important;
-    }
-
-    .stWarning {
-        background: linear-gradient(90deg, #FFF8E8, #FFFAE8) !important;
-        border-left: 4px solid #F4E4A7 !important;
-        border-radius: 12px !important;
-    }
-
-    .stError {
-        background: linear-gradient(90deg, #FFE8E8, #FFF0F0) !important;
-        border-left: 4px solid #F4A7A7 !important;
-        border-radius: 12px !important;
-    }
-
-    /* Divider */
-    hr {
-        border-color: #F4A7B9 !important;
-        opacity: 0.4;
-    }
-
-    /* Spinner */
-    .stSpinner > div {
-        border-top-color: #F4A7B9 !important;
-    }
-
-    /* Info box */
+    hr { border-color: #F4A7B9 !important; opacity: 0.4; }
     .stInfo {
         background: linear-gradient(90deg, #E8F4FF, #F0E8FF) !important;
         border-left: 4px solid #A7C4F4 !important;
         border-radius: 12px !important;
     }
+    .coord-box {
+        background: linear-gradient(135deg, #F0E8FF, #E8F4FF);
+        border-radius: 12px;
+        padding: 8px 12px;
+        border: 1.5px dashed #B07DB8;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #5C4A6E;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚚 RoutePro — Delivery Route Planner")
-st.markdown("<p style='color:#B07DB8; margin-top:-15px; font-size:1rem;'>✨ Plan smarter. Drive better. Save more.</p>", unsafe_allow_html=True)
-
 with st.sidebar:
     st.markdown("### 📍 Route Details")
+
+    st.markdown("**Input Mode**")
+    input_mode = st.radio(
+        "Choose how to enter locations:",
+        ["📍 Address", "🌐 Coordinates (Lat, Lon)"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    if input_mode == "🌐 Coordinates (Lat, Lon)":
+        st.markdown("""
+        <div class='coord-box'>
+        💡 <b>Tip:</b> Get coordinates from<br>
+        <a href='https://maps.google.com' target='_blank'>Google Maps</a> →
+        Right-click any spot → Copy coordinates!
+        </div>
+        """, unsafe_allow_html=True)
+
     route_name = st.text_input("Route Name", placeholder="e.g. Monday Deliveries")
-    origin = st.text_input("Origin Address", placeholder="e.g. 123 Main St, Dallas, TX")
-    destination = st.text_input("Final Destination", placeholder="e.g. 456 Elm St, Dallas, TX")
+    origin = parse_input("Origin", "origin", "e.g. Dallas, TX", "e.g. 32.7767, -96.7970", input_mode)
+    destination = parse_input("Destination", "destination", "e.g. Plano, TX", "e.g. 33.0198, -96.6989", input_mode)
 
     st.markdown("### 🛑 Stops")
     num_stops = st.number_input("Number of Stops", min_value=1, max_value=20, value=2)
     stops = []
     for i in range(num_stops):
-        stop = st.text_input(f"Stop {i+1}", placeholder=f"e.g. Stop {i+1} address", key=f"stop_{i}")
+        stop = parse_input(f"Stop {i+1}", f"stop_{i}", f"e.g. Stop {i+1} address", f"e.g. 32.9, -96.8", input_mode)
         stops.append(stop)
 
     st.divider()
@@ -156,6 +145,9 @@ with st.sidebar:
     mpg = st.number_input("Vehicle Fuel Efficiency (MPG)", min_value=1.0, value=25.0, step=0.5)
 
     optimize_btn = st.button("🗺️ Optimize My Route!", use_container_width=True)
+
+st.title("🚚 RoutePro — Delivery Route Planner")
+st.markdown("<p style='color:#B07DB8; margin-top:-15px; font-size:1rem;'>✨ Plan smarter. Drive better. Save more.</p>", unsafe_allow_html=True)
 
 col1, col2 = st.columns([2, 1])
 
