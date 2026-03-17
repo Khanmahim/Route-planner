@@ -55,14 +55,22 @@ with col1:
     if "result" in st.session_state:
         result = st.session_state["result"]
         all_coords = result["all_coords"]
+        map_coords = result.get("map_coords", all_coords)
+        routing_mode = result.get("routing_mode", "straight")
+
         m = folium.Map(location=all_coords[0], zoom_start=12)
-        
+
+        if routing_mode == "real":
+            st.success("✅ Using real road routing!")
+        else:
+            st.warning("⚠️ Using straight-line estimate (real routing unavailable)")
+
         folium.Marker(all_coords[0], tooltip="Origin", icon=folium.Icon(color="green")).add_to(m)
         for i, coord in enumerate(all_coords[1:-1]):
             folium.Marker(coord, tooltip=f"Stop {i+1}: {result['ordered_stops'][i]}", icon=folium.Icon(color="orange")).add_to(m)
         folium.Marker(all_coords[-1], tooltip="Destination", icon=folium.Icon(color="red")).add_to(m)
-        folium.PolyLine(all_coords, color="blue", weight=3).add_to(m)
-        
+        folium.PolyLine(map_coords, color="blue", weight=4).add_to(m)
+
         st_folium(m, width=700, height=500)
     else:
         m = folium.Map(location=[32.7767, -96.7970], zoom_start=10)
@@ -72,16 +80,14 @@ with col2:
     st.subheader("📊 Route Summary")
     if "result" in st.session_state:
         result = st.session_state["result"]
-        # Convert km to miles
+
         total_km = result["total_distance"]
         total_miles = round(total_km * 0.621371, 2)
         est_time = result["estimated_time"]
 
-        # Fuel calculations
         gallons_used = round(total_miles / mpg, 2)
         fuel_cost = round(gallons_used * fuel_price, 2)
 
-        # Leg-by-leg breakdown
         all_coords = result["all_coords"]
         all_labels = (
             [result["origin"]]
@@ -118,7 +124,7 @@ with col2:
             leg_gallons = round(leg_miles / mpg, 2)
             leg_cost = round(leg_gallons * fuel_price, 2)
             st.markdown(f"""
-            **{i+1}. {all_labels[i]} → {all_labels[i+1]}**  
+            **{i+1}. {all_labels[i]} → {all_labels[i+1]}**
             📏 {leg_miles} mi &nbsp;|&nbsp; ⛽ {leg_gallons} gal &nbsp;|&nbsp; 💵 ${leg_cost}
             """)
 
