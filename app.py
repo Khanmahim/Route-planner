@@ -5,6 +5,7 @@ from database import init_db, save_route, load_routes
 from optimizer import optimize_route
 from datetime import datetime
 import random
+import pandas as pd
 
 init_db()
 
@@ -100,20 +101,38 @@ st.markdown("""
         display: inline-block;
         margin-bottom: 6px;
     }
+    .dash-card {
+        background: linear-gradient(135deg, #FFE8F4, #E8F4FF);
+        border-radius: 20px;
+        padding: 20px;
+        text-align: center;
+        border: 1.5px solid #F4A7B9;
+        box-shadow: 0 4px 15px rgba(244,167,185,0.2);
+        margin-bottom: 12px;
+    }
+    .dash-card .value {
+        font-size: 32px;
+        font-weight: 900;
+        background: linear-gradient(90deg, #F4A7B9, #A7C4F4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 6px 0;
+    }
+    .dash-card .label {
+        color: #B07DB8;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    .dash-card .icon {
+        font-size: 28px;
+        margin-bottom: 4px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-ROUTE_ADJECTIVES = [
-    "Swift", "Breezy", "Golden", "Turbo", "Lucky",
-    "Speedy", "Stellar", "Magic", "Smooth", "Zippy",
-    "Cosmic", "Nimble", "Rapid", "Blazing", "Sunny"
-]
-
-ROUTE_NOUNS = [
-    "Falcon", "Arrow", "Comet", "Drifter", "Voyager",
-    "Rocket", "Dasher", "Cruiser", "Sprinter", "Glider",
-    "Pathfinder", "Express", "Bolt", "Rider", "Chaser"
-]
+ROUTE_ADJECTIVES = ["Swift","Breezy","Golden","Turbo","Lucky","Speedy","Stellar","Magic","Smooth","Zippy","Cosmic","Nimble","Rapid","Blazing","Sunny"]
+ROUTE_NOUNS = ["Falcon","Arrow","Comet","Drifter","Voyager","Rocket","Dasher","Cruiser","Sprinter","Glider","Pathfinder","Express","Bolt","Rider","Chaser"]
 
 def generate_route_name(origin, num_stops):
     now = datetime.now()
@@ -124,14 +143,54 @@ def generate_route_name(origin, num_stops):
     origin_short = origin.split(",")[0].strip()[:15]
     return f"{adj} {noun} — {origin_short} • {num_stops} stops • {day} {time_str}"
 
+def location_input(label, key, input_mode):
+    if input_mode == "📍 Address":
+        return st.text_input(label, placeholder="e.g. Dallas TX USA", key=key)
+    else:
+        return st.text_input(label, placeholder="e.g. 32.910097, -96.745197", key=key)
+
+def compute_dashboard_stats(routes, default_mpg=25.0, default_fuel_price=3.50):
+    if not routes:
+        return None
+    total_routes = len(routes)
+    total_km = sum(float(r[5]) for r in routes)
+    total_miles = round(total_km * 0.621371, 2)
+    total_time = round(sum(float(r[6]) for r in routes), 2)
+    total_gallons = round(total_miles / default_mpg, 2)
+    total_fuel_cost = round(total_gallons * default_fuel_price, 2)
+    avg_cost = round(total_fuel_cost / total_routes, 2)
+
+    origins = [r[2] for r in routes]
+    destinations = [r[3] for r in routes]
+    top_origin = max(set(origins), key=origins.count)
+    top_dest = max(set(destinations), key=destinations.count)
+
+    dates = []
+    for r in routes:
+        try:
+            dates.append(datetime.strptime(r[7], "%Y-%m-%d %H:%M").strftime("%Y-%m-%d"))
+        except:
+            pass
+
+    date_counts = {}
+    for d in dates:
+        date_counts[d] = date_counts.get(d, 0) + 1
+
+    return {
+        "total_routes": total_routes,
+        "total_miles": total_miles,
+        "total_time": total_time,
+        "total_fuel_cost": total_fuel_cost,
+        "avg_cost": avg_cost,
+        "top_origin": top_origin,
+        "top_dest": top_dest,
+        "date_counts": date_counts
+    }
+
+# ── Sidebar ──────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📍 Route Details")
-
-    input_mode = st.radio(
-        "Input Mode",
-        ["📍 Address", "🌐 Coordinates"],
-        horizontal=True
-    )
+    input_mode = st.radio("Input Mode", ["📍 Address", "🌐 Coordinates"], horizontal=True)
 
     if input_mode == "🌐 Coordinates":
         st.markdown("""
@@ -162,9 +221,88 @@ with st.sidebar:
 
     optimize_btn = st.button("🗺️ Optimize My Route!", use_container_width=True)
 
+# ── Header ───────────────────────────────────────────────
 st.title("🚚 RoutePro — Delivery Route Planner")
 st.markdown("<p style='color:#B07DB8; margin-top:-15px; font-size:1rem;'>✨ Plan smarter. Drive better. Save more.</p>", unsafe_allow_html=True)
 
+# ── Dashboard Button ─────────────────────────────────────
+dash_col, _ = st.columns([1, 4])
+with dash_col:
+    if st.button("📊 Open Dashboard", use_container_width=True):
+        st.session_state["show_dashboard"] = not st.session_state.get("show_dashboard", False)
+
+# ── Dashboard Modal ───────────────────────────────────────
+if st.session_state.get("show_dashboard", False):
+    routes = load_routes()
+    stats = compute_dashboard_stats(routes, mpg, fuel_price)
+
+    with st.container():
+        st.markdown("---")
+        st.markdown("## 📊 Your Driving Dashboard")
+
+        if not stats:
+            st.info("🌸 No routes yet! Optimize your first route to see stats here.")
+        else:
+            # Row 1 — 4 key metrics
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>🗺️</div>
+                    <div class='value'>{stats['total_routes']}</div>
+                    <div class='label'>TOTAL ROUTES</div>
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>📏</div>
+                    <div class='value'>{stats['total_miles']}</div>
+                    <div class='label'>TOTAL MILES</div>
+                </div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>⏱️</div>
+                    <div class='value'>{stats['total_time']}h</div>
+                    <div class='label'>TOTAL DRIVE TIME</div>
+                </div>""", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>⛽</div>
+                    <div class='value'>${stats['total_fuel_cost']}</div>
+                    <div class='label'>TOTAL FUEL SPENT</div>
+                </div>""", unsafe_allow_html=True)
+
+            # Row 2 — avg cost + top origin + top dest
+            c5, c6, c7 = st.columns(3)
+            with c5:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>💰</div>
+                    <div class='value'>${stats['avg_cost']}</div>
+                    <div class='label'>AVG COST PER ROUTE</div>
+                </div>""", unsafe_allow_html=True)
+            with c6:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>🏆</div>
+                    <div class='value' style='font-size:16px;'>{stats['top_origin'][:20]}</div>
+                    <div class='label'>MOST USED ORIGIN</div>
+                </div>""", unsafe_allow_html=True)
+            with c7:
+                st.markdown(f"""<div class='dash-card'>
+                    <div class='icon'>🎯</div>
+                    <div class='value' style='font-size:16px;'>{stats['top_dest'][:20]}</div>
+                    <div class='label'>MOST USED DESTINATION</div>
+                </div>""", unsafe_allow_html=True)
+
+            # Row 3 — Routes per day chart
+            if stats["date_counts"]:
+                st.markdown("### 📅 Routes Per Day")
+                df = pd.DataFrame(
+                    list(stats["date_counts"].items()),
+                    columns=["Date", "Routes"]
+                ).sort_values("Date")
+                st.bar_chart(df.set_index("Date"), color="#F4A7B9")
+
+        st.markdown("---")
+
+# ── Main Content ──────────────────────────────────────────
 col1, col2 = st.columns([2, 1])
 
 with col1:
@@ -178,12 +316,9 @@ with col1:
             if error:
                 st.error(f"Error: {error}")
             else:
-                # Auto-generate route name
                 auto_name = generate_route_name(origin, len(stops))
                 result["route_name"] = auto_name
                 st.session_state["result"] = result
-
-                # Always auto-save
                 save_route(
                     auto_name, origin, destination,
                     result["ordered_stops"],
@@ -295,4 +430,4 @@ with col2:
                     st.markdown(f"**⏱️ Est. Time:** {r[6]} hrs")
                     st.markdown(f"**🛑 Stops:** {r[4]}")
     else:
-        st.info("🌸 No saved routes yet. Optimize a route to get started!")
+        st.info("🌸 No saved routes yet!")
