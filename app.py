@@ -6,6 +6,8 @@ from optimizer import optimize_route
 from datetime import datetime
 import random
 import pandas as pd
+import json
+import io
 
 init_db()
 
@@ -28,6 +30,7 @@ st.markdown("""
     .dash-value { font-size: 32px; font-weight: 900; background: linear-gradient(90deg, #F4A7B9, #A7C4F4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 6px 0; }
     .dash-label { color: #B07DB8; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; }
     .dash-icon { font-size: 28px; margin-bottom: 4px; }
+    .csv-box { background: linear-gradient(135deg, #F0E8FF, #E8F4FF); border-radius: 16px; padding: 16px; border: 1.5px dashed #B07DB8; margin-bottom: 12px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,6 +80,17 @@ def compute_stats(routes, mpg, fuel_price):
         "top_dest": top_dest, "date_counts": date_counts
     }
 
+def make_sample_csv():
+    df = pd.DataFrame({
+        "stop_address": [
+            "Empire State Building New York NY",
+            "Times Square New York NY",
+            "Central Park New York NY",
+            "Brooklyn Bridge New York NY"
+        ]
+    })
+    return df.to_csv(index=False).encode("utf-8")
+
 # ── Sidebar ───────────────────────────────────────────────
 with st.sidebar:
     st.header("📍 Route Details")
@@ -94,11 +108,74 @@ with st.sidebar:
     destination = location_input("🏁 Destination", "destination", input_mode)
 
     st.subheader("🛑 Stops")
-    num_stops = st.number_input("Number of Stops", min_value=1, max_value=20, value=2)
-    stops = []
-    for i in range(int(num_stops)):
-        stop = location_input(f"Stop {i+1}", f"stop_{i}", input_mode)
-        stops.append(stop)
+
+    # ── CSV Import ────────────────────────────────────────
+    st.markdown("""
+    <div class='csv-box'>
+    <b>📥 Import Stops from CSV/Excel</b><br>
+    <span style='font-size:12px;color:#5C4A6E;'>Upload a file with a <code>stop_address</code> column</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader(
+        "Upload CSV or Excel",
+        type=["csv", "xlsx"],
+        label_visibility="collapsed"
+    )
+
+    csv_stops = []
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith(".xlsx"):
+                df_upload = pd.read_excel(uploaded_file)
+            else:
+                df_upload = pd.read_csv(uploaded_file)
+
+            # Try to find address column
+            col_names = [c.lower().strip() for c in df_upload.columns]
+            possible = ["stop_address", "address", "stop", "location", "destination", "stops"]
+            found_col = None
+            for p in possible:
+                if p in col_names:
+                    found_col = df_upload.columns[col_names.index(p)]
+                    break
+
+            if found_col:
+                csv_stops = df_upload[found_col].dropna().tolist()
+                csv_stops = [str(s).strip() for s in csv_stops if str(s).strip()]
+                st.success(f"✅ {len(csv_stops)} stops loaded from file!")
+                st.dataframe(
+                    pd.DataFrame({"📦 Imported Stops": csv_stops}),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.error("⚠️ Could not find address column. Make sure your file has a column named: stop_address, address, stop, or location")
+                st.caption("Column names found: " + ", ".join(df_upload.columns.tolist()))
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+    # Download sample CSV
+    st.download_button(
+        "⬇️ Download Sample CSV",
+        data=make_sample_csv(),
+        file_name="sample_stops.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    st.divider()
+
+    # Manual stops (shown only if no CSV loaded)
+    if csv_stops:
+        stops = csv_stops
+        st.info(f"📥 Using {len(stops)} stops from uploaded file")
+    else:
+        num_stops = st.number_input("Number of Stops", min_value=1, max_value=20, value=2)
+        stops = []
+        for i in range(int(num_stops)):
+            stop = location_input(f"Stop {i+1}", f"stop_{i}", input_mode)
+            stops.append(stop)
 
     st.divider()
     st.subheader("⛽ Fuel Settings")
@@ -176,13 +253,13 @@ with col1:
                 auto_name = generate_route_name(origin, len(stops))
                 result["route_name"] = auto_name
                 st.session_state["result"] = result
+                st.session_state.pop("map_saved_route", None)
                 save_route(auto_name, origin, destination,
                           result["ordered_stops"],
                           result["total_distance"],
                           result["estimated_time"])
                 st.success(f"✅ Saved as **{auto_name}**")
 
-    # Check if we should show a saved route on map
     map_result = st.session_state.get("map_saved_route", None)
     active_result = st.session_state.get("result", None)
     display_result = map_result if map_result else active_result
@@ -257,27 +334,24 @@ with col2:
     if routes:
         st.caption(f"🗂️ {len(routes)} route(s) saved")
 
-        # Table view
         df = pd.DataFrame({
             "🗺️ Route Name": [r[1] for r in routes],
             "📍 From": [r[2][:20] for r in routes],
             "🏁 To": [r[3][:20] for r in routes],
             "📏 Miles": [round(float(r[5]) * 0.621371, 1) for r in routes],
             "⏱️ Hrs": [round(float(r[6]), 1) for r in routes],
-            "💰 Cost": [f"${round((float(r[5])*0.621371/mpg)*fuel_price, 2)}" for r in routes],
+            "💰 Cost": [f"${round((float(r[5])*0.621371/mpg)*fuel_price,2)}" for r in routes],
             "🕐 Date": [r[7] for r in routes],
         })
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-        # Click to show on map
-        st.markdown("**🗺️ Show a saved route on map:**")
+        st.markdown("**🗺️ Show saved route on map:**")
         route_names = [r[1] for r in routes]
         selected = st.selectbox("Select route", ["— select —"] + route_names, key="lib_select")
 
         if selected != "— select —":
             chosen = next(r for r in routes if r[1] == selected)
-            with st.spinner("Loading route on map..."):
-                import json
+            with st.spinner("Loading route..."):
                 stops_list = json.loads(chosen[4]) if chosen[4] else []
                 saved_result, err = optimize_route(chosen[2], stops_list, chosen[3])
                 if not err:
@@ -285,7 +359,7 @@ with col2:
                     st.success(f"✅ Showing: {selected}")
                     st.rerun()
                 else:
-                    st.error("Could not reload this route on map.")
+                    st.error("Could not reload this route.")
 
         if st.button("🧹 Clear Map", use_container_width=True):
             st.session_state.pop("map_saved_route", None)
