@@ -35,7 +35,14 @@ def save_route(name, origin, destination, stops, total_distance, estimated_time)
 def load_routes():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT * FROM routes ORDER BY created_at DESC")
+    c.execute("SELECT id, name, origin, destination, stops, total_distance, estimated_time, created_at FROM routes ORDER BY created_at DESC")
     rows = c.fetchall()
     conn.close()
     return rows
+
+def delete_route(route_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM routes WHERE id = ?", (route_id,))
+    conn.commit()
+    conn.close()

@@ -19,7 +19,6 @@ def parse_coord_string(s):
     return None
 
 def geocode_address(address):
-    # Check if it's already coordinates
     coord = parse_coord_string(address)
     if coord:
         return coord
@@ -29,7 +28,7 @@ def geocode_address(address):
         if location:
             return (location.latitude, location.longitude)
         return None
-    except Exception as e:
+    except:
         return None
 
 def calculate_distance(coord1, coord2):
@@ -38,10 +37,7 @@ def calculate_distance(coord1, coord2):
 def get_real_route(coords):
     try:
         url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
-        headers = {
-            "Authorization": ORS_API_KEY,
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": ORS_API_KEY, "Content-Type": "application/json"}
         body = {"coordinates": [[c[1], c[0]] for c in coords]}
         response = requests.post(url, json=body, headers=headers)
         data = response.json()
@@ -53,10 +49,10 @@ def get_real_route(coords):
         duration_hrs = round(summary["duration"] / 3600, 2)
         route_coords = [(c[1], c[0]) for c in feature["geometry"]["coordinates"]]
         return distance_km, duration_hrs, route_coords
-    except Exception as e:
+    except:
         return None, None, None
 
-def nearest_neighbor(origin_coord, stop_coords, dest_coord):
+def nearest_neighbor(origin_coord, stop_coords):
     unvisited = list(enumerate(stop_coords))
     ordered = []
     current = origin_coord
@@ -83,7 +79,7 @@ def optimize_route(origin, stops, destination):
     if not dest_coord:
         return None, "Could not geocode destination address."
 
-    ordered_stops = nearest_neighbor(origin_coord, stop_coords, dest_coord)
+    ordered_stops = nearest_neighbor(origin_coord, stop_coords)
     ordered_stop_names = [stops[i] for i, _ in ordered_stops]
     ordered_stop_coords = [c for _, c in ordered_stops]
     all_coords = [origin_coord] + ordered_stop_coords + [dest_coord]
@@ -92,10 +88,13 @@ def optimize_route(origin, stops, destination):
 
     if real_distance and real_duration and route_coords:
         return {
-            "origin": origin, "destination": destination,
+            "origin": origin,
+            "destination": destination,
             "ordered_stops": ordered_stop_names,
-            "all_coords": all_coords, "map_coords": route_coords,
-            "total_distance": real_distance, "estimated_time": real_duration,
+            "all_coords": all_coords,
+            "map_coords": route_coords,
+            "total_distance": real_distance,
+            "estimated_time": real_duration,
             "routing_mode": "real"
         }, None
     else:
@@ -104,9 +103,11 @@ def optimize_route(origin, stops, destination):
             for i in range(len(all_coords) - 1)
         )
         return {
-            "origin": origin, "destination": destination,
+            "origin": origin,
+            "destination": destination,
             "ordered_stops": ordered_stop_names,
-            "all_coords": all_coords, "map_coords": all_coords,
+            "all_coords": all_coords,
+            "map_coords": all_coords,
             "total_distance": round(total_distance, 2),
             "estimated_time": round(total_distance / 50, 2),
             "routing_mode": "straight"
